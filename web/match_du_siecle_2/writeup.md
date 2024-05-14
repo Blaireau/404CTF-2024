@@ -18,7 +18,9 @@ On reprends le même site Web qu'au challenge précédent, mais cette fois-ci on
 ~~En simulant un achat, on se rend compte que l'algo de vérification passe de RS256 à HS256 (cf. fichier token_jwt)~~
 ~~En utilisant "**jwt_tools**" on va peut-être pouvoir retrouver le mot de passe servant à la signature afin de forger notre propre token.~~
 
-La manipulation du token jwt ne servait à rien. Il fallait jouer avec les appels à différentes pages du site pour faire passer notre achat pour un achat de ticket VIP.
-Suite à cette manipulation, lors de la récupération du billet, notre billet pass pour un billet VIP et lors du téléchargement on obtient un autre pdf avec le flag dedans.
+La manipulation du token jwt ne servait à rien. 
+Il faut de nouveau manipuler les informations envoyées au serveur lors de la récupération du billet. En effet au moment ou on demande notre billet, on appel un endpoint de l'api "*/riche*, avec en paramètre un json qui contient un paramètre "*token*".
 
-**Flag** : {flag}
+Si on modifie la valeur du paramètre "*token*" par la classe de billets que l'on veux (ici **VIP**), on obtient un fichier jpg différent de la première partie du challenge. Ce qui permet de valider le challenge.
+
+**Flag** : 404CTF{b7554ee60d0020216749d428830a55f1}
