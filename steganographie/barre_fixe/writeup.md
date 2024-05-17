@@ -14,156 +14,100 @@ Auteur : Redhpm
 
 ## Solution
 
-65 6a 00
-2e 3e 48 c7 c0 01 00 00 00
-48 c7 c7 01 00 00 00
-2e 3e 48 89 e6
-65 48 c7 c2 01 00 00 00
-2e 3e c6 04 24 55
-2e 3e 0f 05
-65 c6 04 24 6e
-65 0f 05
-65 3e c6 04 24 4d
-65 2e 0f 05
-65 c6 04 24 65
-40 2e 3e 0f 05
-65 2e 3e c6 04 24 73
-40 0f 05
-65 2e 3e c6 04 24 73
-40 0f 05
-2e 3e c6 04 24 61
-65 2e 0f 05
-2e 3e c6 04 24 67
-40 65 2e 3e 0f 05
-65 3e c6 04 24 65
-65 2e 0f 05
-2e 3e c6 04 24 50
-65 0f 05
-2e 3e c6 04 24 61
-40 65 3e 0f 05
-2e c6 04 24 73
-40 3e 0f 05
-65 2e c6 04 24 44
-65 2e 3e 0f 05
-65 c6 04 24 75
-40 65 2e 0f 05
-65 2e c6 04 24 54
-40 65 2e 3e 0f 05
-65 2e c6 04 24 6f
-2e 0f 05
-65 2e 3e c6 04 24 75
-2e 3e 0f 05
-2e 3e c6 04 24 74
-2e 3e 0f 05
-65 2e 3e c6 04 24 53
-40 65 3e 0f 05
-2e c6 04 24 75
-65 3e 0f 05
-2e 3e c6 04 24 73
-65 0f 05
-65 3e c6 04 24 70
-65 3e 0f 05
-65 2e 3e c6 04 24 65
-65 2e 0f 05
-65 c6 04 24 63
-65 2e 0f 05
-65 c6 04 24 74
-40 65 3e 0f 05
-65 2e 3e c6 04 24 0a
-0f 05
-48 c7 c0 3c 00 00 00
-0f 05
+Sans doute le challenge qui a fait ragé beaucoup de personnes, et qui était sans doute "mal" catégorisé (IMHO : c'était au moins une difficulté "moyenne").
+
+### Le binaire sous Ghidra
+
+On a un binaire, donc par réflexe on l'ouvre avec Ghidra. On voit plusieurs choses :
+
+- Des noms de sections qui comportent des liens Youtube vers un rickroll
+- Une longue chaîne "iii"
+- Une fonction main avec des syscalls
+- La décompilation se passe mal pour Ghidra
+
+![Ghidra couine](wu_img/ghidra_chouine.png)
+
+![Ghidra couine 2](wu_img/ghidra_chouine_2.png)
+
+En exécutant le binaire, il affiche un message : "UnMessagePasDuToutSuspect"[^1]
+
+L'inspection du binaire avec Ghidra est donc mitigé, mais on voit que ghidra a quelques soucis à la décompilation alors que le code semble simple.
+Une autre chose me semble un peu bizarre : L'opcode de la première instruction (0x65 0x6a 0x00 // push 0x0) me semble bizarre. Avant ce challenge j'avais déjà passé (beaucoup) de temps dans du code assembleur, et quelque chose me dérange sans savoir quoi[^2].
+
+### Le binaire sous objdump
+
+Comme on dit (parfois) : "*L'outil ne fonctionne pas ? Change d'outil !*"
+J'ai donc passé le binaire dans **objdump** afin d'avoir un deuxième avis :
+
+> objdump -d chall > chall_dump_out
+
+En lisant le résultat d'objdump, quelque chose m'a sauté aux yeux :
+
+> **gs** push $0x0 \
+> **cs** **ds** mov $0x1,%rax \
+> mov    $0x1,%rdi \
+> **cs** **ds** mov %rsp,%rsi \
+> **gs** mov $0x1,%rdx \
+> **cs** **ds** movb $0x55,(%rsp) \
+> **cs** **ds** syscall \
+> movb   $0x6e,%**gs**:(%rsp) \
+> **gs** syscall \
+> **gs** movb $0x4d,%**gs**:(%rsp) \
+> **gs** **cs** syscall \
+> movb   $0x65,%**gs**:(%rsp) \
+> **rex** **cs** **ds** syscall \
+> **gs** **cs** movb $0x73,%**gs**:(%rsp) \
+> etc...
+
+Des symboles en plus apparaissent. Quelques recherches plus tard j'apprends qu'on appelle ça des *segments de registres*. Et je fais le lien avec ce qui me dérangeais plus haut ([^2]), l'opcode du "push 0x0" aurait dû simplement être "**0x6a 0x00**".
+
+### Le déchiffrement
+
+Je pense qu'on a à faire une à une stega custom. Dans ces cas, pour m'aider à visualiser ce que je dois chercher j'écris la partie ASCII fixe du flag (quand il y'en a une) sous diverses formes : binaire, octal, hexa etc...
+
+|Char | Code ASCII hexa | Code ASCII Binaire | Code ASCII decimal |
+|:---:|:---------------:|:------------------:|:------------------:|
+|4    | 0x34            | 0011.0100          | 52
+|0    | 0x30            | 0011.0000          | 48
+|4    | 0x34            | 0011.0100          | 52
+|C    | 0x43            | 0100.0011          | 67
+|T    | 0x54            | 0101.0100          | 84
+|F    | 0x46            | 0100.0110          | 70 
+|{    | 0x7B            | 0111.1011          | 123
+
+En regardant les deux premières lignes de l'assembleur :
+
+> **gs** push $0x0 \
+> **cs** **ds** mov $0x1,%rax \
+
+Je remarque qu'il y'a autant de "*segment de registre*" que de "1" dans la version binaire du "4". Je suppose donc trois choses :
+
+- La présence d'un segment de registre représente un "1"
+- L'absence d'un segment de registre représente un "0"
+- Pour chaque octets camouflés dans le code, les bits de poids faibles sont indiqués en premier.
+
+Néanmoins sur les premières lignes il n'y a que 3 segments qui apparaissent. Or pour pouvoir encoder 8 bits, un multiple de 2 est plus pratique...
+
+En poussant mon analyse aux 14 premières lignes (7 caractères fixes, 2 caractères par ligne, donc 14 lignes à analyser), je remarque que les deux "dernières" font apparaitre le segment "rex", ce qui porte donc à 4 le nombre de segments.
+
+Pour deviner l'ordre dans lequel les segments de registre doivent être placer, j'ai fait quelques essais, mais très vite j'ai trouvé : rex / gs / cs /ds
+
+### Conclusion
+
+Pour retrouver le flag :
+
+- Pour chaque ligne d'assembleur on regarde les segments de registres.
+- Si un segment présent on met à 1, sinon à 0
+- Une ligne encode un nibble --> Deux lignes un octet
+- Les bits de poids faibles sont en premier
+- A certains moment j'ai eu des erreurs de décodage, objdump interpretant parfois mal le binaire, à ces moments-là je me suis rabattu sur le code hexa pour voir les segments de registres utilisés
+
+rex | gs | cs | ds
+:--:|:--:|:--:|:--:
+0x40| 0x65| 0x2e| 0x3e
+
+Après quelques minutes on récupère les valeurs ASCII en binaire du flag, un coup de CyberChef et hop, le flag !
 
 **Flag** : 404CTF{x86_64-iGnor3s-5TuFF}
 
-(rex / gs / cs /ds)
-
-4
-gs push $0x0
-cs ds mov $0x1,%rax
-0
-mov    $0x1,%rdi
-cs ds mov %rsp,%rsi
-4
-gs mov $0x1,%rdx
-cs ds movb $0x55,(%rsp)
-C
-cs ds syscall
-movb   $0x6e,%gs:(%rsp)
-T
-65 0f 05                gs syscall
-65 3e c6 04 24 4d       gs movb $0x4d,%gs:(%rsp)
-F
-65 2e 0f 05             gs cs syscall
-65 c6 04 24 65          movb   $0x65,%gs:(%rsp)
-{
-40 2e 3e 0f 05          rex cs ds syscall
-65 2e 3e c6 04 24 73    gs cs movb $0x73,%gs:(%rsp)
-x
-40 0f 05                rex syscall
-65 2e 3e c6 04 24 73    gs cs movb $0x73,%gs:(%rsp)
-8
-40 0f 05                rex syscall
-2e 3e c6 04 24 61       cs ds movb $0x61,(%rsp)
-6
-65 2e 0f 05             gs cs syscall
-2e 3e c6 04 24 67       cs ds movb $0x67,(%rsp)
-_
-40 65 2e 3e 0f 05       rex gs cs ds syscall
-65 3e c6 04 24 65       gs movb $0x65,%gs:(%rsp)
-6
-65 2e 0f 05             gs cs syscall
-2e 3e c6 04 24 50       cs ds movb $0x50,(%rsp)
-4
-65 0f 05                gs syscall
-2e 3e c6 04 24 61       cs ds movb $0x61,(%rsp)
--
-40 65 3e 0f 05          rex gs ds syscall
-2e c6 04 24 73          cs movb $0x73,(%rsp)
-i
-40 3e 0f 05             rex ds syscall
-65 2e c6 04 24 44       gs movb $0x44,%gs:(%rsp)
-G
-65 2e 3e 0f 05          gs cs ds syscall
-65 c6 04 24 75          movb   $0x75,%gs:(%rsp)
-n
-40 65 2e 0f 05          rex gs cs syscall
-65 2e c6 04 24 54       gs movb $0x54,%gs:(%rsp)
-o
-40 65 2e 3e 0f 05       rex gs cs ds syscall
-65 2e c6 04 24 6f       gs movb $0x6f,%gs:(%rsp)
-
-2e 0f 05                cs syscall
-65 2e 3e c6 04 24 75    gs cs movb $0x75,%gs:(%rsp)
-
-2e 3e 0f 05             cs ds syscall
-
-2e 3e c6 04 24 74       cs ds movb $0x74,(%rsp)
-2e 3e 0f 05             cs ds syscall
-
-65 2e 3e c6 04 24 53    gs cs movb $0x53,%gs:(%rsp)
-40 65 3e 0f 05          rex gs ds syscall
-             
-2e c6 04 24 75          cs movb $0x75,(%rsp)
-65 3e 0f 05             gs ds syscall
-
-2e 3e c6 04 24 73       cs ds movb $0x73,(%rsp)
-65 0f 05                gs syscall
-
-65 3e c6 04 24 70       gs movb $0x70,%gs:(%rsp)
-65 3e 0f 05             gs ds syscall
-
-65 2e 3e c6 04 24 65    gs cs movb $0x65,%gs:(%rsp)
-65 2e 0f 05             gs cs syscall
-
-65 c6 04 24 63          movb   $0x63,%gs:(%rsp)
-65 2e 0f 05             gs cs syscall
-
-65 c6 04 24 74          movb   $0x74,%gs:(%rsp)
-40 65 3e 0f 05          rex gs ds syscall
-
-65 2e 3e c6 04 24 0a    gs cs movb $0xa,%gs:(%rsp)
-0f 05                   syscall
-
-48 c7 c0 3c 00 00 00    mov    $0x3c,%rax
-0f 05                   syscall
+[^1] : Je cite ça de mémoire. Je rédige ce write-up sans pouvoir exécuter le binaire, et j'ai la maxi-flemme de lancer une VM pour faire ça...
